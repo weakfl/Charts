@@ -35,8 +35,8 @@ open class HorizontalGradientBarChartRenderer: HorizontalBarChartRenderer
 
         gradient = CGGradient(colorsSpace: colorspace, colors: fillColors as CFArray, locations: locations)!;
         //Vertical Gradient
-        let startPoint : CGPoint = CGPoint(x: viewPortHandler.contentLeft, y: 0.0);
-        let endPoint : CGPoint = CGPoint(x: viewPortHandler.contentRight, y: 0.0);
+        let startPoint : CGPoint = CGPoint(x: viewPortHandler?.contentLeft ?? 0, y: 0.0);
+        let endPoint : CGPoint = CGPoint(x: viewPortHandler?.contentRight ?? 0, y: 0.0);
         //Horizontal Gradient
         //let startPoint : CGPoint = CGPointMake(0.0, 0.0);
         //let endPoint : CGPoint = CGPointMake(viewPortHandler.contentLeft, 0.0);
