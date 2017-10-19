@@ -186,6 +186,11 @@ open class HorizontalBarChartRenderer: BarChartRenderer
             dataProvider = dataProvider,
             let viewPortHandler = self.viewPortHandler
             else { return }
+
+        var drawGradient: Bool = false
+        if dataSet.colors.count == dataSet.entryCount * 2 {
+            drawGradient = true
+        }
         
         let trans = dataProvider.getTransformer(forAxis: dataSet.axisDependency)
         
@@ -242,14 +247,20 @@ open class HorizontalBarChartRenderer: BarChartRenderer
         let buffer = _buffers[index]
         
         let isSingleColor = dataSet.colors.count == 1
-        
+
         if isSingleColor
         {
-            context.setFillColor(dataSet.color(atIndex: 0).cgColor)
+            if drawGradient {
+                addGradient(context: context, colors    : [dataSet.color(atIndex: 0), dataSet.color(atIndex: 1)], rect: buffer.rects.first ?? CGRect.zero)
+            } else {
+                context.setFillColor(dataSet.color(atIndex: 0).cgColor)
+            }
         }
         
         for j in stride(from: 0, to: buffer.rects.count, by: 1)
         {
+            context.saveGState()
+
             let barRect = buffer.rects[j]
             
             if (!viewPortHandler.isInBoundsTop(barRect.origin.y + barRect.size.height))
@@ -261,24 +272,51 @@ open class HorizontalBarChartRenderer: BarChartRenderer
             {
                 continue
             }
+
+            let path = UIBezierPath(roundedRect: barRect,
+                                    byRoundingCorners: .allCorners,
+                                    cornerRadii: CGSize(width: 2, height: 2))
+            path.addClip()
             
             if !isSingleColor
             {
                 // Set the color for the currently drawn value. If the index is out of bounds, reuse colors.
-                context.setFillColor(dataSet.color(atIndex: j).cgColor)
+                if drawGradient {
+                    addGradient(context: context, colors: [dataSet.color(atIndex: j*2), dataSet.color(atIndex: j*2+1)], rect: barRect)
+                } else {
+                    context.setFillColor(dataSet.color(atIndex: j).cgColor)
+                }
             }
-            
-            context.fill(barRect)
-            
+
+            if !drawGradient {
+                context.fill(barRect)
+            }
+
             if drawBorder
             {
                 context.setStrokeColor(borderColor.cgColor)
                 context.setLineWidth(borderWidth)
                 context.stroke(barRect)
             }
+
+            context.restoreGState()
         }
-        
         context.restoreGState()
+    }
+
+    private func addGradient(context: CGContext, colors: [UIColor], rect: CGRect) {
+        let colorspace = CGColorSpaceCreateDeviceRGB();
+
+        let fillColors = colors.map{( $0.cgColor )}
+        let gradient = CGGradient(colorsSpace: colorspace, colors: fillColors as CFArray, locations: [0.0, 1.0])!;
+
+        let startPoint : CGPoint = CGPoint(x: rect.minX, y: rect.minY);
+        let endPoint : CGPoint = CGPoint(x: rect.maxX, y: rect.maxY );
+
+        context.drawLinearGradient(gradient,
+                                   start: startPoint,
+                                   end: endPoint,
+                                   options: CGGradientDrawingOptions.drawsBeforeStartLocation);
     }
     
     open override func prepareBarHighlight(
