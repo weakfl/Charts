@@ -19,6 +19,8 @@ import CoreGraphics
 
 open class HorizontalBarChartRenderer: BarChartRenderer
 {
+    open var valueAlignment: YAxis.AxisDependency = .right
+
     fileprivate class Buffer
     {
         var rects = [CGRect]()
@@ -431,11 +433,12 @@ open class HorizontalBarChartRenderer: BarChartRenderer
                         
                         if dataSet.isDrawValuesEnabled
                         {
+                            let xPos = valueAlignment == .left ? rect.origin.x + 10 : (rect.origin.x + rect.size.width)
+                                + (val >= 0.0 ? posOffset : negOffset)
                             drawValue(
                                 context: context,
                                 value: valueText,
-                                xPos: (rect.origin.x + rect.size.width)
-                                    + (val >= 0.0 ? posOffset : negOffset),
+                                xPos: xPos,
                                 yPos: y + yOffset,
                                 font: valueFont,
                                 align: textAlign,
