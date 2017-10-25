@@ -20,6 +20,7 @@ import CoreGraphics
 open class HorizontalBarChartRenderer: BarChartRenderer
 {
     open var valueAlignment: YAxis.AxisDependency = .right
+    open var minBarWidthPercentage: CGFloat = -1.0
 
     fileprivate class Buffer
     {
@@ -86,6 +87,33 @@ open class HorizontalBarChartRenderer: BarChartRenderer
         var barRect = CGRect()
         var x: Double
         var y: Double
+        var minWidthFactorVariable: CGFloat = 1.0
+        var minWidthFactorFixed: CGFloat = 0.0
+        var maxValue: CGFloat = 0.0
+        
+        if minBarWidthPercentage >= 0.0 && minBarWidthPercentage <= 1.0 {
+            // get maximum width
+            for i in stride(from: 0, to: min(Int(ceil(Double(dataSet.entryCount) * animator.phaseX)), dataSet.entryCount), by: 1) {
+                guard let e = dataSet.entryForIndex(i) as? BarChartDataEntry else { continue }
+                
+                let vals = e.yValues
+                
+                x = e.x
+                y = e.y
+            
+                var right = isInverted
+                    ? (y <= 0.0 ? CGFloat(y) : 0)
+                    : (y >= 0.0 ? CGFloat(y) : 0)
+                var left = isInverted
+                    ? (y >= 0.0 ? CGFloat(y) : 0)
+                    : (y <= 0.0 ? CGFloat(y) : 0)
+                
+                var width = right - left
+                if width > maxValue {
+                    maxValue = width
+                }
+            }
+        }
         
         for i in stride(from: 0, to: min(Int(ceil(Double(dataSet.entryCount) * animator.phaseX)), dataSet.entryCount), by: 1)
         {
@@ -117,8 +145,10 @@ open class HorizontalBarChartRenderer: BarChartRenderer
                     left *= CGFloat(phaseY)
                 }
                 
+                let width = right - left
+
                 barRect.origin.x = left
-                barRect.size.width = right - left
+                barRect.size.width = width / maxValue * maxValue * (1.0 - minBarWidthPercentage) + maxValue * minBarWidthPercentage
                 barRect.origin.y = top
                 barRect.size.height = bottom - top
                 
