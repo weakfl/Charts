@@ -213,10 +213,7 @@ open class HorizontalBarChartRenderer: BarChartRenderer
     
     open override func drawDataSet(context: CGContext, dataSet: IBarChartDataSet, index: Int)
     {
-        guard let
-            dataProvider = dataProvider,
-            let viewPortHandler = self.viewPortHandler
-            else { return }
+        guard let dataProvider = dataProvider else { return }
 
         var drawGradient: Bool = false
         if dataSet.colors.count == dataSet.entryCount * 2 {
