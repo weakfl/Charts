@@ -19,6 +19,9 @@ import CoreGraphics
 
 open class HorizontalBarChartRenderer: BarChartRenderer
 {
+    open var valueAlignment: YAxis.AxisDependency = .right
+    open var minBarWidthPercentage: CGFloat = -1.0
+
     private class Buffer
     {
         var rects = [CGRect]()
@@ -83,6 +86,33 @@ open class HorizontalBarChartRenderer: BarChartRenderer
         var barRect = CGRect()
         var x: Double
         var y: Double
+        var minWidthFactorVariable: CGFloat = 1.0
+        var minWidthFactorFixed: CGFloat = 0.0
+        var maxValue: CGFloat = 0.0
+        
+        if minBarWidthPercentage >= 0.0 && minBarWidthPercentage <= 1.0 {
+            // get maximum width
+            for i in stride(from: 0, to: min(Int(ceil(Double(dataSet.entryCount) * animator.phaseX)), dataSet.entryCount), by: 1) {
+                guard let e = dataSet.entryForIndex(i) as? BarChartDataEntry else { continue }
+                
+                let vals = e.yValues
+                
+                x = e.x
+                y = e.y
+            
+                var right = isInverted
+                    ? (y <= 0.0 ? CGFloat(y) : 0)
+                    : (y >= 0.0 ? CGFloat(y) : 0)
+                var left = isInverted
+                    ? (y >= 0.0 ? CGFloat(y) : 0)
+                    : (y <= 0.0 ? CGFloat(y) : 0)
+                
+                var width = right - left
+                if width > maxValue {
+                    maxValue = width
+                }
+            }
+        }
         
         for i in stride(from: 0, to: min(Int(ceil(Double(dataSet.entryCount) * animator.phaseX)), dataSet.entryCount), by: 1)
         {
@@ -114,8 +144,10 @@ open class HorizontalBarChartRenderer: BarChartRenderer
                     left *= CGFloat(phaseY)
                 }
                 
+                let width = right - left
+
                 barRect.origin.x = left
-                barRect.size.width = right - left
+                barRect.size.width = width / maxValue * maxValue * (1.0 - minBarWidthPercentage) + maxValue * minBarWidthPercentage
                 barRect.origin.y = top
                 barRect.size.height = bottom - top
                 
@@ -182,6 +214,11 @@ open class HorizontalBarChartRenderer: BarChartRenderer
     open override func drawDataSet(context: CGContext, dataSet: IBarChartDataSet, index: Int)
     {
         guard let dataProvider = dataProvider else { return }
+
+        var drawGradient: Bool = false
+        if dataSet.colors.count == dataSet.entryCount * 2 {
+            drawGradient = true
+        }
         
         let trans = dataProvider.getTransformer(forAxis: dataSet.axisDependency)
         
@@ -235,14 +272,20 @@ open class HorizontalBarChartRenderer: BarChartRenderer
         let buffer = _buffers[index]
         
         let isSingleColor = dataSet.colors.count == 1
-        
+
         if isSingleColor
         {
-            context.setFillColor(dataSet.color(atIndex: 0).cgColor)
+            if drawGradient {
+                addGradient(context: context, colors    : [dataSet.color(atIndex: 0), dataSet.color(atIndex: 1)], rect: buffer.rects.first ?? CGRect.zero)
+            } else {
+                context.setFillColor(dataSet.color(atIndex: 0).cgColor)
+            }
         }
         
         for j in stride(from: 0, to: buffer.rects.count, by: 1)
         {
+            context.saveGState()
+
             let barRect = buffer.rects[j]
             
             if (!viewPortHandler.isInBoundsTop(barRect.origin.y + barRect.size.height))
@@ -254,24 +297,51 @@ open class HorizontalBarChartRenderer: BarChartRenderer
             {
                 continue
             }
+
+            let path = UIBezierPath(roundedRect: barRect,
+                                    byRoundingCorners: .allCorners,
+                                    cornerRadii: CGSize(width: 2, height: 2))
+            path.addClip()
             
             if !isSingleColor
             {
                 // Set the color for the currently drawn value. If the index is out of bounds, reuse colors.
-                context.setFillColor(dataSet.color(atIndex: j).cgColor)
+                if drawGradient {
+                    addGradient(context: context, colors: [dataSet.color(atIndex: j*2), dataSet.color(atIndex: j*2+1)], rect: barRect)
+                } else {
+                    context.setFillColor(dataSet.color(atIndex: j).cgColor)
+                }
             }
-            
-            context.fill(barRect)
-            
+
+            if !drawGradient {
+                context.fill(barRect)
+            }
+
             if drawBorder
             {
                 context.setStrokeColor(borderColor.cgColor)
                 context.setLineWidth(borderWidth)
                 context.stroke(barRect)
             }
+
+            context.restoreGState()
         }
-        
         context.restoreGState()
+    }
+
+    private func addGradient(context: CGContext, colors: [UIColor], rect: CGRect) {
+        let colorspace = CGColorSpaceCreateDeviceRGB();
+
+        let fillColors = colors.map{( $0.cgColor )}
+        let gradient = CGGradient(colorsSpace: colorspace, colors: fillColors as CFArray, locations: [0.0, 1.0])!;
+
+        let startPoint : CGPoint = CGPoint(x: rect.minX, y: rect.minY);
+        let endPoint : CGPoint = CGPoint(x: rect.maxX, y: rect.maxY );
+
+        context.drawLinearGradient(gradient,
+                                   start: startPoint,
+                                   end: endPoint,
+                                   options: CGGradientDrawingOptions.drawsBeforeStartLocation);
     }
     
     open override func prepareBarHighlight(
@@ -384,11 +454,12 @@ open class HorizontalBarChartRenderer: BarChartRenderer
                         
                         if dataSet.isDrawValuesEnabled
                         {
+                            let xPos = valueAlignment == .left ? rect.origin.x + 10 : (rect.origin.x + rect.size.width)
+                                + (val >= 0.0 ? posOffset : negOffset)
                             drawValue(
                                 context: context,
                                 value: valueText,
-                                xPos: (rect.origin.x + rect.size.width)
-                                    + (val >= 0.0 ? posOffset : negOffset),
+                                xPos: xPos,
                                 yPos: y + yOffset,
                                 font: valueFont,
                                 align: textAlign,
